@@ -1,0 +1,202 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Hardened Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 3. Entity Validation Blueprints
+    function isValidPlaylist(data) {
+      return data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+             data.ownerName is string && data.ownerName.size() >= 1 && data.ownerName.size() <= 80 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+             data.description is string && data.description.size() <= 300 &&
+             data.neighborhood is string && data.neighborhood.size() >= 1 && data.neighborhood.size() <= 80 &&
+             data.moodTag is string && data.moodTag.size() >= 1 && data.moodTag.size() <= 40 &&
+             data.coverTheme is string && data.coverTheme in ['amber', 'crimson', 'emerald', 'violet', 'cyan'] &&
+             data.isShared is bool &&
+             data.shareCode is string && data.shareCode.size() >= 4 && data.shareCode.size() <= 20 &&
+             data.trackIds is list && data.trackIds.size() <= 50 &&
+             (data.trackIds.size() == 0 || (data.trackIds[0] is string && data.trackIds[0].size() <= 128)) &&
+             data.likesCount is int && data.likesCount >= 0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidArtistTrack(data) {
+      return data.uploaderId is string && data.uploaderId.size() >= 1 && data.uploaderId.size() <= 128 &&
+             data.artistName is string && data.artistName.size() >= 1 && data.artistName.size() <= 80 &&
+             data.trackTitle is string && data.trackTitle.size() >= 1 && data.trackTitle.size() <= 100 &&
+             data.city is string && data.city.size() >= 1 && data.city.size() <= 80 &&
+             data.genre is string && data.genre in ['Indie Rock', 'Lo-Fi Beats', 'Neo-Soul', 'Synthwave', 'Folk Acoustic', 'Underground Hip-Hop'] &&
+             data.streamUrl is string && data.streamUrl.size() >= 1 && data.streamUrl.size() <= 500 &&
+             data.bio is string && data.bio.size() <= 300 &&
+             data.durationSec is int && data.durationSec >= 10 && data.durationSec <= 1200 &&
+             data.isPublic is bool &&
+             data.playsCount is int && data.playsCount >= 0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSavedTrack(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.trackId is string && data.trackId.size() >= 1 && data.trackId.size() <= 128 &&
+             data.trackTitle is string && data.trackTitle.size() >= 1 && data.trackTitle.size() <= 100 &&
+             data.artistName is string && data.artistName.size() >= 1 && data.artistName.size() <= 80 &&
+             data.city is string && data.city.size() >= 1 && data.city.size() <= 80 &&
+             data.genre is string && data.genre.size() >= 1 && data.genre.size() <= 40 &&
+             data.streamUrl is string && data.streamUrl.size() >= 1 && data.streamUrl.size() <= 500 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // 4. Collection Rules: Playlists
+    match /playlists/{playlistId} {
+      allow get: if isSignedIn() && isValidId(playlistId) &&
+                    (existing().ownerId == request.auth.uid || existing().isShared == true);
+
+      allow list: if isSignedIn() &&
+                     (existing().ownerId == request.auth.uid || existing().isShared == true);
+
+      allow create: if isSignedIn() &&
+                       isValidId(playlistId) &&
+                       incoming().ownerId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'ownerId', 'ownerName', 'title', 'description', 'neighborhood',
+                         'moodTag', 'coverTheme', 'isShared', 'shareCode', 'trackIds',
+                         'likesCount', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'ownerId', 'ownerName', 'title', 'description', 'neighborhood',
+                         'moodTag', 'coverTheme', 'isShared', 'shareCode', 'trackIds',
+                         'likesCount', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidPlaylist(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(playlistId) &&
+                       isValidPlaylist(incoming()) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         // Action 1: Owner edits playlist details, tracks, or share status
+                         (existing().ownerId == request.auth.uid &&
+                          incoming().ownerId == request.auth.uid &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'title', 'description', 'neighborhood', 'moodTag',
+                            'coverTheme', 'isShared', 'trackIds', 'likesCount', 'updatedAt'
+                          ])) ||
+                         // Action 2: Authenticated listener likes a shared playlist (+1)
+                         (existing().isShared == true &&
+                          incoming().isShared == true &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'updatedAt']) &&
+                          incoming().likesCount == existing().likesCount + 1)
+                       );
+
+      allow delete: if isSignedIn() &&
+                       isValidId(playlistId) &&
+                       existing().ownerId == request.auth.uid;
+    }
+
+    // 5. Collection Rules: Local Artist Tracks
+    match /artist_tracks/{trackId} {
+      allow get: if isSignedIn() && isValidId(trackId) &&
+                    (existing().uploaderId == request.auth.uid || existing().isPublic == true);
+
+      allow list: if isSignedIn() &&
+                     (existing().uploaderId == request.auth.uid || existing().isPublic == true);
+
+      allow create: if isSignedIn() &&
+                       isValidId(trackId) &&
+                       incoming().uploaderId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'uploaderId', 'artistName', 'trackTitle', 'city', 'genre',
+                         'streamUrl', 'bio', 'durationSec', 'isPublic', 'playsCount',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'uploaderId', 'artistName', 'trackTitle', 'city', 'genre',
+                         'streamUrl', 'bio', 'durationSec', 'isPublic', 'playsCount',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidArtistTrack(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(trackId) &&
+                       isValidArtistTrack(incoming()) &&
+                       incoming().uploaderId == existing().uploaderId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         // Action 1: Uploader updates track details
+                         (existing().uploaderId == request.auth.uid &&
+                          incoming().uploaderId == request.auth.uid &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'artistName', 'trackTitle', 'city', 'genre', 'streamUrl',
+                            'bio', 'durationSec', 'isPublic', 'playsCount', 'updatedAt'
+                          ])) ||
+                         // Action 2: Listener increments play count on public track
+                         (existing().isPublic == true &&
+                          incoming().isPublic == true &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['playsCount', 'updatedAt']) &&
+                          incoming().playsCount == existing().playsCount + 1)
+                       );
+
+      allow delete: if isSignedIn() &&
+                       isValidId(trackId) &&
+                       existing().uploaderId == request.auth.uid;
+    }
+
+    // 6. Collection Rules: Per-User Saved Tracks
+    match /users/{userId}/saved_tracks/{trackId} {
+      allow get: if isSignedIn() && isValidId(userId) && isValidId(trackId) && request.auth.uid == userId;
+      allow list: if isSignedIn() && request.auth.uid == userId;
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isValidId(trackId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'userId', 'trackId', 'trackTitle', 'artistName',
+                         'city', 'genre', 'streamUrl', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'trackId', 'trackTitle', 'artistName',
+                         'city', 'genre', 'streamUrl', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidSavedTrack(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isValidId(trackId) &&
+                       request.auth.uid == userId &&
+                       isValidSavedTrack(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'trackTitle', 'artistName', 'city', 'genre', 'streamUrl', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && isValidId(userId) && isValidId(trackId) && request.auth.uid == userId;
+    }
+  }
+}

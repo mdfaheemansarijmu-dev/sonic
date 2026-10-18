@@ -1,0 +1,236 @@
+{
+  "entities": {
+    "Playlist": {
+      "title": "Playlist",
+      "description": "A user-curated music playlist of local artists that can be kept private or shared with friends.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the user who created the playlist."
+        },
+        "ownerName": {
+          "type": "string",
+          "description": "Display name of the playlist creator."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the curated playlist."
+        },
+        "description": {
+          "type": "string",
+          "description": "Curator notes and vibe description."
+        },
+        "neighborhood": {
+          "type": "string",
+          "description": "Local scene or neighborhood tag."
+        },
+        "moodTag": {
+          "type": "string",
+          "description": "Mood or vibe tag for discovery."
+        },
+        "coverTheme": {
+          "type": "string",
+          "enum": ["amber", "crimson", "emerald", "violet", "cyan"],
+          "description": "Visual theme key for the playlist cover."
+        },
+        "isShared": {
+          "type": "boolean",
+          "description": "Whether the playlist is shared publicly with friends and the community."
+        },
+        "shareCode": {
+          "type": "string",
+          "description": "Short invite code for sharing with friends."
+        },
+        "trackIds": {
+          "type": "array",
+          "description": "Ordered list of track IDs included in the playlist (up to 50)."
+        },
+        "likesCount": {
+          "type": "integer",
+          "description": "Number of likes from friends and listeners."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when created (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when last updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "ownerId",
+        "ownerName",
+        "title",
+        "description",
+        "neighborhood",
+        "moodTag",
+        "coverTheme",
+        "isShared",
+        "shareCode",
+        "trackIds",
+        "likesCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ArtistTrack": {
+      "title": "ArtistTrack",
+      "description": "An original music track uploaded by a local artist for online streaming.",
+      "type": "object",
+      "properties": {
+        "uploaderId": {
+          "type": "string",
+          "description": "UID of the artist/user who published the track."
+        },
+        "artistName": {
+          "type": "string",
+          "description": "Stage name of the local artist or band."
+        },
+        "trackTitle": {
+          "type": "string",
+          "description": "Title of the track."
+        },
+        "city": {
+          "type": "string",
+          "description": "Local city or neighborhood of the artist."
+        },
+        "genre": {
+          "type": "string",
+          "enum": [
+            "Indie Rock",
+            "Lo-Fi Beats",
+            "Neo-Soul",
+            "Synthwave",
+            "Folk Acoustic",
+            "Underground Hip-Hop"
+          ],
+          "description": "Musical genre."
+        },
+        "streamUrl": {
+          "type": "string",
+          "description": "Online audio stream URL or studio synth URI."
+        },
+        "bio": {
+          "type": "string",
+          "description": "Short artist story and background."
+        },
+        "durationSec": {
+          "type": "integer",
+          "description": "Track duration in seconds."
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "Whether the track is publicly streamable online."
+        },
+        "playsCount": {
+          "type": "integer",
+          "description": "Total online stream count."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when published (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "uploaderId",
+        "artistName",
+        "trackTitle",
+        "city",
+        "genre",
+        "streamUrl",
+        "bio",
+        "durationSec",
+        "isPublic",
+        "playsCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SavedTrack": {
+      "title": "SavedTrack",
+      "description": "A track bookmarked into a user's personal library.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the user who saved the track."
+        },
+        "trackId": {
+          "type": "string",
+          "description": "Identifier of the saved track."
+        },
+        "trackTitle": {
+          "type": "string",
+          "description": "Title of the saved track."
+        },
+        "artistName": {
+          "type": "string",
+          "description": "Name of the local artist."
+        },
+        "city": {
+          "type": "string",
+          "description": "Artist city or scene."
+        },
+        "genre": {
+          "type": "string",
+          "description": "Track genre."
+        },
+        "streamUrl": {
+          "type": "string",
+          "description": "Stream URL for online playback."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when saved (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "trackId",
+        "trackTitle",
+        "artistName",
+        "city",
+        "genre",
+        "streamUrl",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/playlists/{playlistId}": {
+      "schema": {
+        "$ref": "#/entities/Playlist"
+      },
+      "description": "Stores curated playlists owned by users and shared with friends."
+    },
+    "/artist_tracks/{trackId}": {
+      "schema": {
+        "$ref": "#/entities/ArtistTrack"
+      },
+      "description": "Stores local artist tracks published for online discovery and streaming."
+    },
+    "/users/{userId}/saved_tracks/{trackId}": {
+      "schema": {
+        "$ref": "#/entities/SavedTrack"
+      },
+      "description": "Per-user collection of saved favorite tracks from local artists."
+    }
+  }
+}

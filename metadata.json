@@ -1,0 +1,6 @@
+{
+  "name": "SonicLocal",
+  "description": "Discover local independent artists, stream original music online, and share curated playlists with friends.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
